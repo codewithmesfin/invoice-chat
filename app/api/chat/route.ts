@@ -242,6 +242,7 @@ export async function POST(req: Request) {
       supabase,
       userId: user.id,
       invoiceId,
+      request: req,
     });
     if (sent.ok) {
       autoEmailLines.push(`A payment link for the new invoice was emailed to ${sent.toEmail}.`);

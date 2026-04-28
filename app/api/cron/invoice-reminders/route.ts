@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   try {
     admin = createAdminClient();
     getEmailFrom();
-    appBase = assertAppUrl();
+    appBase = assertAppUrl(req);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Config";
     return NextResponse.json({ skipped: true, reason: msg }, { status: 200 });

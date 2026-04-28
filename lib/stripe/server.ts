@@ -13,10 +13,4 @@ export function getStripe(): Stripe {
   return stripe;
 }
 
-export function assertAppUrl(): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
-  if (!base) {
-    throw new Error("Missing NEXT_PUBLIC_APP_URL (e.g. https://yourdomain.com).");
-  }
-  return base;
-}
+export { assertAppUrl } from "@/lib/app/public-url";

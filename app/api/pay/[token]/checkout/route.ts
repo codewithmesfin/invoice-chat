@@ -5,7 +5,7 @@ import { assertAppUrl, getStripe } from "@/lib/stripe/server";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(_req: Request, { params }: { params: { token: string } }) {
+export async function POST(req: Request, { params }: { params: { token: string } }) {
   const token = params.token?.trim() ?? "";
   const lookup = await fetchInvoiceByPayToken(token);
   if (!lookup.ok) {
@@ -35,7 +35,7 @@ export async function POST(_req: Request, { params }: { params: { token: string 
   let appBase: string;
   try {
     stripe = getStripe();
-    appBase = assertAppUrl();
+    appBase = assertAppUrl(req);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Stripe not configured";
     return NextResponse.json({ error: "stripe_config", message: msg }, { status: 503 });

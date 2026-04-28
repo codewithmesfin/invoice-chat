@@ -32,28 +32,15 @@ export function BottomNav() {
               key={href}
               href={href}
               className={cn(
-                "group relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[9px] font-semibold tracking-tight text-muted-foreground transition-colors sm:text-[10.5px]",
+                "group relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-sm font-semibold tracking-tight text-muted-foreground transition-colors sm:text-sm",
                 active && "text-primary"
               )}
             >
-              {active ? (
-                <span
-                  className="absolute inset-x-2 top-1 h-8 rounded-xl bg-primary/[0.1] sm:inset-x-3"
-                  aria-hidden
-                />
-              ) : null}
-              <span
-                className={cn(
-                  "relative z-[1] flex h-8 w-10 items-center justify-center rounded-xl transition-colors sm:h-9 sm:w-11",
-                  !active && "group-hover:bg-muted/80 group-hover:text-foreground"
-                )}
-              >
-                <Icon
+               <Icon
                   className="size-[1.15rem] shrink-0 sm:size-[22px]"
                   strokeWidth={active ? 2.35 : 1.9}
                   aria-hidden
                 />
-              </span>
               <span className="relative z-[1] max-w-full truncate px-0.5">{label}</span>
             </Link>
           );

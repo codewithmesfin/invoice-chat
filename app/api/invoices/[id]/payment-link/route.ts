@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { assertAppUrl } from "@/lib/stripe/server";
 
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: { id: string } }) {
   const id = params.id;
   const supabase = await createClient();
   const {
@@ -13,7 +13,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   let appBase: string;
   try {
-    appBase = assertAppUrl();
+    appBase = assertAppUrl(req);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "App URL not configured";
     return NextResponse.json({ error: msg }, { status: 503 });

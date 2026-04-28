@@ -124,13 +124,15 @@ export async function trySendInvoiceLinkAfterChatCreate(opts: {
   supabase: SupabaseClient;
   userId: string;
   invoiceId: string;
+  /** Pass through from the chat API route so payment links use the live host, not localhost. */
+  request?: Request;
 }): Promise<
   | { ok: true; toEmail: string }
   | { ok: false; reason: "smtp" | "app_url" | "not_found" | "bad_state" | "too_small" | "no_client_email" | "send" }
 > {
   let appBase: string;
   try {
-    appBase = assertAppUrl();
+    appBase = assertAppUrl(opts.request);
   } catch {
     return { ok: false, reason: "app_url" };
   }
