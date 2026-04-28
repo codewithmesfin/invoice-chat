@@ -8,6 +8,13 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.lovable
+.qodo
+.next
+.next/cache
+.next/types
+.next/cache/
+.next/types/
 .npm-cache
 dist
 dist-ssr

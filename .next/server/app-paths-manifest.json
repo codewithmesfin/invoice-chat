@@ -1,5 +1,0 @@
-{
-  "/pay/return/page": "app/pay/return/page.js",
-  "/pay/[token]/page": "app/pay/[token]/page.js",
-  "/(protected)/chat/page": "app/(protected)/chat/page.js"
-}
