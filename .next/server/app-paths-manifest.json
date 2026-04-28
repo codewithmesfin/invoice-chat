@@ -1,10 +1,5 @@
 {
-  "/api/customers/route": "app/api/customers/route.js",
-  "/api/expenses/route": "app/api/expenses/route.js",
-  "/api/invoices/route": "app/api/invoices/route.js",
-  "/api/chat/sessions/[id]/route": "app/api/chat/sessions/[id]/route.js",
-  "/(protected)/customers/page": "app/(protected)/customers/page.js",
-  "/(protected)/chat/page": "app/(protected)/chat/page.js",
-  "/(protected)/invoices/page": "app/(protected)/invoices/page.js",
-  "/(protected)/expenses/page": "app/(protected)/expenses/page.js"
+  "/pay/return/page": "app/pay/return/page.js",
+  "/pay/[token]/page": "app/pay/[token]/page.js",
+  "/(protected)/chat/page": "app/(protected)/chat/page.js"
 }

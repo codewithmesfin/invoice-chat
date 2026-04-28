@@ -42,7 +42,7 @@ async function findCustomerByName(ctx: ToolContext, query: string) {
 
   const { data, error } = await ctx.supabase
     .from("customers")
-    .select("id,name,email,notes,created_at")
+    .select("id,name,email,phone,notes,created_at")
     .eq("user_id", ctx.userId)
     .ilike("name", `%${q}%`)
     .limit(20);
@@ -138,43 +138,25 @@ function pickTotalCents(input: Record<string, unknown>): number | null {
   return null;
 }
 
-async function resolveCustomerId(
+function pickCustomerNameQuery(input: Record<string, unknown>): string {
+  const fromName =
+    typeof input.customer_name === "string" ? input.customer_name.trim() : "";
+  if (fromName) return fromName;
+  const fromQuery =
+    typeof input.customer_query === "string" ? input.customer_query.trim() : "";
+  return fromQuery;
+}
+
+async function resolveCustomerIdByName(
   ctx: ToolContext,
-  input: Record<string, unknown>
+  nameQ: string
 ): Promise<
   | { customer_id: string | null; resolution_note: string }
-  | { error: string; customers?: { id: string; name: string; email: string | null }[] }
+  | { error: "multiple_customers_match"; customers: { id: string; name: string; email: string | null; phone: string | null }[] }
 > {
-  const idRaw = input.customer_id;
-  if (typeof idRaw === "string" && /^[0-9a-f-]{36}$/i.test(idRaw.trim())) {
-    const id = idRaw.trim();
-    const { data, error } = await ctx.supabase
-      .from("customers")
-      .select("id,name")
-      .eq("id", id)
-      .eq("user_id", ctx.userId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!data) {
-      return { error: "customer_id not found for this account" };
-    }
-    return { customer_id: id, resolution_note: `Linked to client "${data.name}".` };
-  }
-
-  const nameQ =
-    typeof input.customer_name === "string"
-      ? input.customer_name.trim()
-      : typeof input.customer_query === "string"
-        ? input.customer_query.trim()
-        : "";
-
-  if (!nameQ) {
-    return { customer_id: null, resolution_note: "No client linked (no customer_id or name)." };
-  }
-
   const { data, error } = await ctx.supabase
     .from("customers")
-    .select("id,name,email")
+    .select("id,name,email,phone")
     .eq("user_id", ctx.userId)
     .ilike("name", `%${nameQ}%`)
     .limit(8);
@@ -194,6 +176,7 @@ async function resolveCustomerId(
         id: r.id as string,
         name: r.name as string,
         email: (r.email as string | null) ?? null,
+        phone: (r.phone as string | null) ?? null,
       })),
     };
   }
@@ -203,6 +186,42 @@ async function resolveCustomerId(
     customer_id: one.id,
     resolution_note: `Linked to client "${one.name}".`,
   };
+}
+
+async function resolveCustomerId(
+  ctx: ToolContext,
+  input: Record<string, unknown>
+): Promise<
+  | { customer_id: string | null; resolution_note: string }
+  | { error: string; customers?: { id: string; name: string; email: string | null; phone: string | null }[] }
+> {
+  const nameQ = pickCustomerNameQuery(input);
+
+  const idRaw = input.customer_id;
+  if (typeof idRaw === "string" && /^[0-9a-f-]{36}$/i.test(idRaw.trim())) {
+    const id = idRaw.trim();
+    const { data, error } = await ctx.supabase
+      .from("customers")
+      .select("id,name")
+      .eq("id", id)
+      .eq("user_id", ctx.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (data) {
+      return { customer_id: id, resolution_note: `Linked to client "${data.name}".` };
+    }
+    // UUID not in this account (often a model placeholder) — fall back to name if provided
+    if (nameQ) {
+      return resolveCustomerIdByName(ctx, nameQ);
+    }
+    return { error: "customer_id not found for this account" };
+  }
+
+  if (!nameQ) {
+    return { customer_id: null, resolution_note: "No client linked (no customer_id or name)." };
+  }
+
+  return resolveCustomerIdByName(ctx, nameQ);
 }
 
 async function createInvoice(ctx: ToolContext, input: Record<string, unknown>) {
@@ -328,6 +347,8 @@ async function createCustomer(ctx: ToolContext, input: Record<string, unknown>) 
     rawEmail && !email ? "Provided email was not saved (invalid format)." : undefined;
 
   const notes = pickCustomerNotes(input);
+  const phoneRaw = typeof input.phone === "string" ? input.phone.trim().slice(0, 40) : "";
+  const phone = phoneRaw || null;
 
   const { data, error } = await ctx.supabase
     .from("customers")
@@ -335,9 +356,10 @@ async function createCustomer(ctx: ToolContext, input: Record<string, unknown>) 
       user_id: ctx.userId,
       name,
       email,
+      phone,
       notes,
     })
-    .select("id,name,email,notes,created_at")
+    .select("id,name,email,phone,notes,created_at")
     .single();
 
   if (error) {

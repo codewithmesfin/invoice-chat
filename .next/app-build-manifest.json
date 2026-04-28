@@ -1,14 +1,9 @@
 {
   "pages": {
-    "/(protected)/customers/page": [
+    "/pay/[token]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(protected)/customers/page.js"
-    ],
-    "/(protected)/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(protected)/layout.js"
+      "static/chunks/app/pay/[token]/page.js"
     ],
     "/layout": [
       "static/chunks/webpack.js",
@@ -16,20 +11,35 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/(protected)/invoices/page": [
+    "/(protected)/invoices/[id]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(protected)/invoices/page.js"
+      "static/chunks/app/(protected)/invoices/[id]/page.js"
     ],
-    "/(protected)/expenses/page": [
+    "/(protected)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(protected)/expenses/page.js"
+      "static/chunks/app/(protected)/layout.js"
+    ],
+    "/pay/return/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/pay/return/page.js"
+    ],
+    "/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/page.js"
     ],
     "/(protected)/chat/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(protected)/chat/page.js"
+    ],
+    "/(protected)/invoices/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(protected)/invoices/page.js"
     ]
   }
 }

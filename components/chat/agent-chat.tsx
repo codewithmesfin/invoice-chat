@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   History,
@@ -10,6 +10,7 @@ import {
   Paperclip,
   Plus,
   RotateCcw,
+  Search,
   Send,
   Sparkles,
   X,
@@ -38,7 +39,12 @@ import {
   parseJsonSafe,
   type ApiErrorBody,
 } from "@/lib/http/api-user-message";
-import { ChatSessionsDrawer, type ChatSessionRow } from "@/components/chat/chat-sessions-drawer";
+import { ChatSessionsDrawer } from "@/components/chat/chat-sessions-drawer";
+import {
+  ChatSessionsList,
+  formatSessionUpdated,
+  type ChatSessionRow,
+} from "@/components/chat/chat-sessions-list";
 import { extractInvoiceLinksFromMessageMetadata } from "@/lib/chat/invoice-links-from-steps";
 
 type ChatRole = "user" | "assistant";
@@ -140,6 +146,18 @@ export function AgentChat() {
   const [renameTarget, setRenameTarget] = useState<ChatSessionRow | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [renameSaving, setRenameSaving] = useState(false);
+  const [sessionSearch, setSessionSearch] = useState("");
+
+  const filteredSessions = useMemo(() => {
+    const q = sessionSearch.trim().toLowerCase();
+    if (!q) return sessions;
+    return sessions.filter((s) => (s.title ?? "").toLowerCase().includes(q));
+  }, [sessions, sessionSearch]);
+
+  const activeSessionRow = useMemo(
+    () => (sessionId ? (sessions.find((s) => s.id === sessionId) ?? null) : null),
+    [sessions, sessionId]
+  );
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -481,7 +499,32 @@ export function AgentChat() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+      <aside className="hidden min-h-0 w-[min(100%,280px)] shrink-0 flex-col border-r border-border/80 bg-card/95 shadow-sm lg:flex xl:w-80">
+        <div className="shrink-0 space-y-2 border-b border-border/70 px-3 py-3">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Chats</p>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Input
+              value={sessionSearch}
+              onChange={(e) => setSessionSearch(e.target.value)}
+              placeholder="Search conversations…"
+              className="h-9 rounded-lg border-border/80 bg-muted/40 pl-9 text-sm"
+              aria-label="Search conversations"
+            />
+          </div>
+        </div>
+        <ChatSessionsList
+          sessions={filteredSessions}
+          loading={sessionsLoading}
+          currentSessionId={sessionId}
+          onSelect={selectSession}
+          onRename={openRename}
+          onDelete={deleteSession}
+        />
+      </aside>
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <header className="relative z-20 shrink-0 border-b border-border/70 bg-card/95 px-3 py-3 shadow-sm backdrop-blur-md sm:px-5">
         <div className="pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-primary/[0.08] blur-2xl" aria-hidden />
         <div className="relative mx-auto flex max-w-3xl items-center gap-2">
@@ -489,7 +532,7 @@ export function AgentChat() {
             type="button"
             variant="ghost"
             size="icon"
-            className="size-10 shrink-0 touch-manipulation rounded-full [-webkit-tap-highlight-color:transparent]"
+            className="size-10 shrink-0 touch-manipulation rounded-full [-webkit-tap-highlight-color:transparent] lg:hidden"
             aria-label="Chat history"
             onClick={() => setHistoryOpen(true)}
           >
@@ -585,7 +628,9 @@ export function AgentChat() {
               </h2>
               <p className="mx-auto mt-3 max-w-md text-pretty text-center text-[15px] leading-relaxed text-muted-foreground">
                 Invoices, clients, expenses, and balances — tap a suggestion or type below. Conversations are saved
-                automatically; use History to reopen them.
+                automatically
+                <span className="lg:hidden">; use History to reopen them.</span>
+                <span className="hidden lg:inline">; on desktop, pick a thread in the list on the left.</span>
               </p>
               <div className="mt-10 -mx-1 flex gap-2 overflow-x-auto pb-2 pt-1 sm:mx-0 sm:flex-wrap sm:justify-center">
                 {SUGGESTIONS.map((s) => (
@@ -826,6 +871,51 @@ export function AgentChat() {
           AI can make mistakes — double-check amounts on receipts and invoices before relying on them.
         </p>
       </div>
+      </div>
+
+      <aside
+        className="hidden min-h-0 w-[min(100%,18rem)] shrink-0 flex-col border-l border-border/70 bg-card/60 backdrop-blur-sm xl:flex"
+        aria-label="Chat sidebar"
+      >
+        <div className="shrink-0 border-b border-border/70 px-4 py-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Conversation</p>
+          <p className="mt-1.5 truncate text-sm font-semibold text-foreground">{sessionHeading}</p>
+          {activeSessionRow ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Updated {formatSessionUpdated(activeSessionRow.updated_at)}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">Send a message to start — threads stay in Chats.</p>
+          )}
+        </div>
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-3">
+          <p className="mb-1 px-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Workspace</p>
+          <Link
+            href="/invoices"
+            className="rounded-lg px-3 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted/80"
+          >
+            Invoices
+          </Link>
+          <Link
+            href="/customers"
+            className="rounded-lg px-3 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted/80"
+          >
+            Clients
+          </Link>
+          <Link
+            href="/expenses"
+            className="rounded-lg px-3 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted/80"
+          >
+            Expenses
+          </Link>
+          <Link
+            href="/settings"
+            className="rounded-lg px-3 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted/80"
+          >
+            Profile
+          </Link>
+        </nav>
+      </aside>
     </div>
   );
 }

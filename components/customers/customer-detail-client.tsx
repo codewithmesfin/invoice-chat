@@ -2,16 +2,18 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Mail, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Trash2, Upload } from "lucide-react";
 import { friendlyUserMessage, parseJsonSafe, type ApiErrorBody } from "@/lib/http/api-user-message";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type Customer = {
   id: string;
   name: string;
   email: string | null;
+  phone: string | null;
   notes: string | null;
 };
 
@@ -49,6 +51,11 @@ export function CustomerDetailClient({ customerId }: { customerId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [draftEmail, setDraftEmail] = useState("");
+  const [draftPhone, setDraftPhone] = useState("");
+  const [draftNotes, setDraftNotes] = useState("");
+  const [saveBusy, setSaveBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -81,6 +88,42 @@ export function CustomerDetailClient({ customerId }: { customerId: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!customer) return;
+    setDraftName(customer.name);
+    setDraftEmail(customer.email ?? "");
+    setDraftPhone(customer.phone ?? "");
+    setDraftNotes(customer.notes ?? "");
+  }, [customer]);
+
+  async function saveContact(e: React.FormEvent) {
+    e.preventDefault();
+    if (!customer) return;
+    setSaveBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/customers/${customerId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: draftName.trim(),
+          email: draftEmail.trim(),
+          phone: draftPhone.trim(),
+          notes: draftNotes.trim(),
+        }),
+      });
+      const raw = await parseJsonSafe(res);
+      const j = (raw ?? {}) as ApiErrorBody;
+      if (!res.ok) {
+        setError(friendlyUserMessage(res.status, j, "Couldn’t save changes."));
+        return;
+      }
+      await load();
+    } finally {
+      setSaveBusy(false);
+    }
+  }
 
   async function onUploadFile(file: File) {
     setBusy(true);
@@ -177,6 +220,12 @@ export function CustomerDetailClient({ customerId }: { customerId: string }) {
                 <Mail className="size-3.5 shrink-0 text-primary" aria-hidden />
                 {customer.email ?? "No email on file"}
               </span>
+              {customer.phone?.trim() ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/80 px-3 py-1 font-medium text-foreground ring-1 ring-border/60">
+                  <Phone className="size-3.5 shrink-0 text-primary" aria-hidden />
+                  {customer.phone.trim()}
+                </span>
+              ) : null}
             </div>
             {customer.notes ? (
               <p className="mt-4 max-w-prose text-sm leading-relaxed text-muted-foreground">{customer.notes}</p>
@@ -192,6 +241,62 @@ export function CustomerDetailClient({ customerId }: { customerId: string }) {
           {error}
         </p>
       ) : null}
+
+      <Card>
+        <CardHeader className="border-b border-border/70 pb-4">
+          <CardTitle className="text-lg font-bold">Contact details</CardTitle>
+          <CardDescription>Name, email, phone, and notes — saved to this client record.</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <form onSubmit={(e) => void saveContact(e)} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Name</Label>
+              <Input
+                id="edit-name"
+                className="h-11 rounded-xl"
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                required
+                autoComplete="name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                className="h-11 rounded-xl"
+                value={draftEmail}
+                onChange={(e) => setDraftEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">Phone</Label>
+              <Input
+                id="edit-phone"
+                type="tel"
+                className="h-11 rounded-xl"
+                value={draftPhone}
+                onChange={(e) => setDraftPhone(e.target.value)}
+                autoComplete="tel"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-notes">Notes</Label>
+              <Input
+                id="edit-notes"
+                className="h-11 rounded-xl"
+                value={draftNotes}
+                onChange={(e) => setDraftNotes(e.target.value)}
+              />
+            </div>
+            <Button type="submit" className="h-11 rounded-xl font-semibold" disabled={saveBusy || !draftName.trim()}>
+              {saveBusy ? "Saving…" : "Save changes"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="border-b border-border/70 pb-4">

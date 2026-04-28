@@ -11,7 +11,7 @@ Tool inputs (JSON "input" field):
 - find_invoice_by_status: { "status": "draft" | "sent" | "paid" | "overdue" | "cancelled" }
 - summarize_finances: {} — aggregates totals by invoice status for this user
 - detect_overdue_invoices: {} — invoices with due_date before today and status not paid/cancelled
-- create_customer: { "name": string (or customer_name / company_name / client_name), "email"?: string, "notes"?: string } — adds a client; invalid email strings are omitted with a warning in the tool output
+- create_customer: { "name": string (or customer_name / company_name / client_name), "email"?: string, "phone"?: string, "notes"?: string } — adds a client; invalid email strings are omitted with a warning in the tool output
 - create_invoice: creates one invoice for this user. Fields:
   - total_cents (integer, preferred) OR total_dollars / amount (number or string like "199.50") — required
   - number (string, optional) — human-readable invoice #; omit to auto-generate (INV-…)
@@ -21,14 +21,15 @@ Tool inputs (JSON "input" field):
   - currency: string (optional, default USD)
   - notes: string (optional)
 
-When the user asks to create, add, or raise an invoice/bill, include a create_invoice step with parsed amounts (convert dollars to cents or use total_dollars). If the client is named but ambiguous, use find_customer_by_name first, then create_invoice with customer_id.
+When the user asks to create, add, or raise an invoice/bill, include a create_invoice step with parsed amounts (convert dollars to cents or use total_dollars). If the client is named but ambiguous, use find_customer_by_name first, then create_invoice with customer_id set to the exact "id" string from a matching tool output — never invent, guess, or placeholder UUIDs. If find_customer_by_name returns exactly one customer, that row's "id" is the customer_id for create_invoice (or pass customer_name / customer_query instead of customer_id).
 
 - create_customer: add a client record. Fields:
   - name (string, required) OR customer_name / company_name / client_name
   - email (string, optional) — must look like a valid email or it will be omitted
+  - phone (string, optional) — digits/plus/parens/spaces, max ~40 chars
   - notes (string, optional)
 
-When the user asks to add, create, or save a client/customer/contact/company, use create_customer with the parsed name and any email or notes from the message.
+When the user asks to add, create, or save a client/customer/contact/company, use create_customer with the parsed name and any email, phone, or notes from the message.
 
 - list_expenses: { "limit"?: number } — recent expenses (default 25, max 50) for context
 - create_expense: log a spend. Fields:

@@ -18,7 +18,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="pointer-events-auto fixed inset-x-0 bottom-0 z-[95] w-full max-w-[100vw] border-t border-border/80 bg-card/95 shadow-[0_-12px_40px_hsl(224_47%_11%/0.08)] backdrop-blur-xl backdrop-saturate-150 [backface-visibility:hidden]"
+      className="pointer-events-auto fixed inset-x-0 bottom-0 z-[95] w-full max-w-[100vw] border-t border-border/80 bg-card/95 shadow-[0_-12px_40px_hsl(224_47%_11%/0.08)] backdrop-blur-xl backdrop-saturate-150 [backface-visibility:hidden] lg:hidden"
       style={{ paddingBottom: "max(0.45rem, env(safe-area-inset-bottom, 0px))" }}
       aria-label="Primary"
     >

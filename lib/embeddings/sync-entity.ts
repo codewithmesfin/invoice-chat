@@ -8,14 +8,15 @@ export async function syncCustomerEmbedding(
 ) {
   const { data, error } = await supabase
     .from("customers")
-    .select("name,email,notes")
+    .select("name,email,phone,notes")
     .eq("id", customerId)
     .eq("user_id", userId)
     .single();
 
   if (error || !data) return;
 
-  const text = `Customer ${data.name}. Email: ${data.email ?? ""}. Notes: ${data.notes ?? ""}`;
+  const phone = "phone" in data ? String((data as { phone?: string | null }).phone ?? "") : "";
+  const text = `Customer ${data.name}. Email: ${data.email ?? ""}. Phone: ${phone}. Notes: ${data.notes ?? ""}`;
   const embedding = await embedText(text);
   await supabase
     .from("customers")

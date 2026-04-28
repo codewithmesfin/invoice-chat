@@ -122,6 +122,7 @@ export function InvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
   const [sendName, setSendName] = useState("");
   const [sendEmailDraft, setSendEmailDraft] = useState("");
   const [sendFormError, setSendFormError] = useState<string | null>(null);
+  const [flashNotice, setFlashNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -149,6 +150,18 @@ export function InvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("invoice_flash");
+      if (!raw) return;
+      sessionStorage.removeItem("invoice_flash");
+      const o = JSON.parse(raw) as { kind?: string; message?: string };
+      if (o.kind === "warning" && typeof o.message === "string") setFlashNotice(o.message);
+    } catch {
+      /* ignore */
+    }
+  }, [invoiceId]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -391,6 +404,22 @@ export function InvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
   return (
     <div className="flex w-full flex-col gap-6">
       {backLink()}
+
+      {flashNotice ? (
+        <div
+          role="status"
+          className="flex items-start justify-between gap-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm leading-relaxed text-amber-950"
+        >
+          <span>{flashNotice}</span>
+          <button
+            type="button"
+            className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-amber-950/90 underline-offset-2 hover:underline"
+            onClick={() => setFlashNotice(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       <div className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.08] via-card to-card p-6 shadow-card sm:p-8">
         <div className="absolute -right-8 -top-8 size-40 rounded-full bg-primary/[0.07] blur-2xl" aria-hidden />

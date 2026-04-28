@@ -22,6 +22,7 @@ type Customer = {
   id: string;
   name: string;
   email: string | null;
+  phone: string | null;
   notes: string | null;
   created_at: string;
 };
@@ -54,8 +55,11 @@ function avatarClass(name: string) {
 
 function subtitleLine(c: Customer) {
   const email = c.email?.trim();
+  const phone = c.phone?.trim();
   const notes = c.notes?.trim();
+  if (email && phone) return `${email} · ${phone}`;
   if (email) return email;
+  if (phone) return phone;
   if (notes) return notes;
   return "No email on file";
 }
@@ -67,6 +71,7 @@ export function CustomersClient() {
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -120,7 +125,12 @@ export function CustomersClient() {
       const res = await fetch("/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email: email || undefined, notes: notes || undefined }),
+        body: JSON.stringify({
+          name,
+          email: email || undefined,
+          phone: phone || undefined,
+          notes: notes || undefined,
+        }),
       });
       const raw = await parseJsonSafe(res);
       const body = raw as ApiErrorBody | null;
@@ -130,6 +140,7 @@ export function CustomersClient() {
       }
       setName("");
       setEmail("");
+      setPhone("");
       setNotes("");
       setModalOpen(false);
       await load();
@@ -285,6 +296,21 @@ export function CustomersClient() {
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
                   placeholder="name@company.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="client-phone" className="text-sm font-semibold text-foreground">
+                  Phone <span className="font-normal text-muted-foreground">(optional)</span>
+                </Label>
+                <Input
+                  id="client-phone"
+                  type="tel"
+                  inputMode="tel"
+                  className="h-12 rounded-xl text-base"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  autoComplete="tel"
+                  placeholder="+1 555 0100"
                 />
               </div>
               <div className="space-y-2">

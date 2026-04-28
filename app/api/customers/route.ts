@@ -6,6 +6,7 @@ import { syncCustomerEmbedding } from "@/lib/embeddings/sync-entity";
 const PostSchema = z.object({
   name: z.string().min(1).max(200),
   email: z.string().max(255).optional(),
+  phone: z.string().max(40).optional(),
   notes: z.string().max(2000).optional(),
 });
 
@@ -23,7 +24,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("customers")
-    .select("id,name,email,notes,created_at")
+    .select("id,name,email,phone,notes,created_at")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -72,14 +73,16 @@ export async function POST(req: Request) {
     );
   }
 
-  const { name, email, notes } = parsed.data;
+  const { name, email, phone, notes } = parsed.data;
   const emailTrim = email?.trim();
+  const phoneTrim = phone?.trim();
   const { data, error } = await supabase
     .from("customers")
     .insert({
       user_id: user.id,
       name,
       email: emailTrim ? emailTrim : null,
+      phone: phoneTrim ? phoneTrim : null,
       notes: notes ?? null,
     })
     .select("id")

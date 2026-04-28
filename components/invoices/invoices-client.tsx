@@ -21,7 +21,9 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { friendlyUserMessage, parseJsonSafe, type ApiErrorBody } from "@/lib/http/api-user-message";
 import { cn } from "@/lib/utils";
 
-type Customer = { id: string; name: string };
+const NEW_CLIENT_VALUE = "__new__";
+
+type Customer = { id: string; name: string; email: string | null; phone?: string | null };
 
 type InvoiceRow = {
   id: string;
@@ -53,7 +55,13 @@ export function InvoicesClient() {
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [customerId, setCustomerId] = useState("");
+  /** "" = no client, uuid = existing, NEW_CLIENT_VALUE = create new */
+  const [clientChoice, setClientChoice] = useState("");
+  const [newClientName, setNewClientName] = useState("");
+  const [newClientEmail, setNewClientEmail] = useState("");
+  /** When an existing client has no email and we need to send after create */
+  const [supplementalEmail, setSupplementalEmail] = useState("");
+  const [sendAfterCreate, setSendAfterCreate] = useState(false);
   const [number, setNumber] = useState("");
   const [status, setStatus] = useState("draft");
   const [due, setDue] = useState("");
@@ -61,6 +69,21 @@ export function InvoicesClient() {
   const [notes, setNotes] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const totalCentsPreview = useMemo(() => {
+    const d = Number.parseFloat(total || "0");
+    if (Number.isNaN(d)) return 0;
+    return Math.max(0, Math.round(d * 100));
+  }, [total]);
+
+  const selectedCustomer = useMemo(
+    () => (clientChoice && clientChoice !== NEW_CLIENT_VALUE ? customers.find((c) => c.id === clientChoice) : undefined),
+    [clientChoice, customers]
+  );
+
+  useEffect(() => {
+    if (totalCentsPreview < 50 && sendAfterCreate) setSendAfterCreate(false);
+  }, [totalCentsPreview, sendAfterCreate]);
 
   const load = useCallback(async () => {
     setListError(null);
@@ -97,6 +120,16 @@ export function InvoicesClient() {
 
   function openModal() {
     setFormError(null);
+    setClientChoice("");
+    setNewClientName("");
+    setNewClientEmail("");
+    setSupplementalEmail("");
+    setSendAfterCreate(false);
+    setNumber("");
+    setDue("");
+    setTotal("");
+    setNotes("");
+    setStatus("draft");
     setModalOpen(true);
   }
 
@@ -113,11 +146,96 @@ export function InvoicesClient() {
     try {
       const dollars = Number.parseFloat(total || "0");
       const total_cents = Math.round(dollars * 100);
+      if (!number.trim()) {
+        setFormError("Invoice number is required.");
+        return;
+      }
+
+      let resolvedCustomerId: string | null = null;
+
+      if (clientChoice === NEW_CLIENT_VALUE) {
+        const nm = newClientName.trim();
+        if (!nm) {
+          setFormError("Enter the new client’s name.");
+          return;
+        }
+        const rRes = await fetch("/api/customers/resolve-or-create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: nm,
+            email: newClientEmail.trim() || undefined,
+          }),
+        });
+        const rRaw = await parseJsonSafe(rRes);
+        const rJson = rRaw as { customer?: { id: string; email?: string | null }; message?: string } & ApiErrorBody;
+        if (rRes.status === 409) {
+          setFormError(
+            rJson.message ??
+              "Several clients share that name. Pick one from the list or use a slightly different name."
+          );
+          return;
+        }
+        if (!rRes.ok || !rJson.customer?.id) {
+          setFormError(friendlyUserMessage(rRes.status, rJson, "Couldn’t save this client."));
+          return;
+        }
+        resolvedCustomerId = rJson.customer.id;
+        const custRow = rJson.customer;
+        if (sendAfterCreate) {
+          if (total_cents < 50) {
+            setFormError("Totals under $0.50 can’t use emailed checkout links.");
+            return;
+          }
+          const effectiveEmail = newClientEmail.trim() || custRow.email?.trim() || "";
+          if (!effectiveEmail) {
+            setFormError("Add an email for this client so we can send the payment link.");
+            return;
+          }
+        }
+      } else if (clientChoice) {
+        const c = customers.find((x) => x.id === clientChoice);
+        if (!c) {
+          setFormError("That client is no longer available. Refresh the list and pick again.");
+          return;
+        }
+        resolvedCustomerId = c.id;
+        if (sendAfterCreate) {
+          if (total_cents < 50) {
+            setFormError("Totals under $0.50 can’t use emailed checkout links.");
+            return;
+          }
+          const existingEmail = c.email?.trim() ?? "";
+          const extra = supplementalEmail.trim();
+          const sendTo = existingEmail || extra;
+          if (!sendTo) {
+            setFormError("Add this client’s billing email so we can send the payment link.");
+            return;
+          }
+          if (!existingEmail && extra) {
+            const pRes = await fetch(`/api/customers/${c.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: extra }),
+            });
+            const pRaw = await parseJsonSafe(pRes);
+            const pJson = pRaw as ApiErrorBody;
+            if (!pRes.ok) {
+              setFormError(friendlyUserMessage(pRes.status, pJson, "Couldn’t save the email on this client."));
+              return;
+            }
+          }
+        }
+      } else if (sendAfterCreate) {
+        setFormError("Choose a client or add a new one before emailing a payment link.");
+        return;
+      }
+
       const res = await fetch("/api/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customer_id: customerId || null,
+          customer_id: resolvedCustomerId,
           number,
           status,
           due_date: due || null,
@@ -131,11 +249,45 @@ export function InvoicesClient() {
         setFormError(friendlyUserMessage(res.status, body, "Couldn’t create this invoice."));
         return;
       }
+
+      if (sendAfterCreate && body.id) {
+        const sRes = await fetch(`/api/invoices/${body.id}/send-email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kind: "invoice_link" }),
+        });
+        const sRaw = await parseJsonSafe(sRes);
+        const sJson = sRaw as { message?: string } & ApiErrorBody;
+        if (!sRes.ok) {
+          try {
+            const msg =
+              friendlyUserMessage(
+                sRes.status,
+                sJson,
+                "Invoice was created, but the payment link email did not go out."
+              ) + " Use “Email invoice” here to try again.";
+            sessionStorage.setItem(
+              "invoice_flash",
+              JSON.stringify({
+                kind: "warning",
+                message: msg,
+              })
+            );
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
       setNumber("");
       setDue("");
       setTotal("");
       setNotes("");
-      setCustomerId("");
+      setClientChoice("");
+      setNewClientName("");
+      setNewClientEmail("");
+      setSupplementalEmail("");
+      setSendAfterCreate(false);
       setModalOpen(false);
       await load();
       if (body.id) router.push(`/invoices/${body.id}`);
@@ -278,7 +430,7 @@ export function InvoicesClient() {
           <DialogHeader>
             <DialogTitle>New invoice</DialogTitle>
             <DialogDescription>
-              Link a client if you want. You can add line items later from the detail page if your workflow grows.
+              Attach a client for emailed payment links — we validate or quietly create their record before sending.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={onCreate} className="flex max-h-[min(70dvh,560px)] flex-col">
@@ -295,16 +447,86 @@ export function InvoicesClient() {
                 <select
                   id="inv-cust"
                   className={selectClass}
-                  value={customerId}
-                  onChange={(e) => setCustomerId(e.target.value)}
+                  value={clientChoice}
+                  onChange={(e) => setClientChoice(e.target.value)}
                 >
                   <option value="">Optional</option>
                   {customers.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
+                      {!c.email?.trim() ? " (no email)" : ""}
                     </option>
                   ))}
+                  <option value={NEW_CLIENT_VALUE}>+ New client…</option>
                 </select>
+                {selectedCustomer ? (
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {selectedCustomer.email?.trim() ? (
+                      <>
+                        Billing email on file:{" "}
+                        <span className="font-mono text-foreground">{selectedCustomer.email.trim()}</span>
+                      </>
+                    ) : (
+                      <>No billing email on file yet — add one below if you email the payment link.</>
+                    )}
+                  </p>
+                ) : null}
+                {clientChoice === NEW_CLIENT_VALUE ? (
+                  <div className="space-y-3 rounded-xl border border-border/70 bg-muted/25 p-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="inv-new-name" className="text-xs font-semibold">
+                        Name
+                      </Label>
+                      <Input
+                        id="inv-new-name"
+                        className="h-11 rounded-xl text-base"
+                        value={newClientName}
+                        onChange={(e) => setNewClientName(e.target.value)}
+                        placeholder="Company or person"
+                        autoComplete="organization"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="inv-new-email" className="text-xs font-semibold">
+                        Email <span className="font-normal text-muted-foreground">(recommended)</span>
+                      </Label>
+                      <Input
+                        id="inv-new-email"
+                        type="email"
+                        className="h-11 rounded-xl text-base"
+                        value={newClientEmail}
+                        onChange={(e) => setNewClientEmail(e.target.value)}
+                        placeholder="billing@example.com"
+                        autoComplete="email"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        If this name already matches a saved client, we link to them and merge this email when provided.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+                {sendAfterCreate &&
+                selectedCustomer &&
+                clientChoice !== NEW_CLIENT_VALUE &&
+                !selectedCustomer.email?.trim() ? (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="inv-sup-email" className="text-xs font-semibold">
+                      Billing email <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="inv-sup-email"
+                      type="email"
+                      className="h-11 rounded-xl text-base"
+                      value={supplementalEmail}
+                      onChange={(e) => setSupplementalEmail(e.target.value)}
+                      placeholder="billing@example.com"
+                      autoComplete="email"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Saved on this client before we send — you only enter it once.
+                    </p>
+                  </div>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="inv-num" className="text-sm font-semibold text-foreground">
@@ -370,6 +592,27 @@ export function InvoicesClient() {
                   placeholder="Memo on the invoice"
                 />
               </div>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/70 bg-muted/20 px-3 py-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 size-4 shrink-0 rounded border-input accent-primary"
+                  checked={sendAfterCreate}
+                  onChange={(e) => setSendAfterCreate(e.target.checked)}
+                  disabled={totalCentsPreview < 50}
+                />
+                <span className="text-sm leading-snug">
+                  <span className="font-semibold text-foreground">Email payment link</span> right after creating
+                  {totalCentsPreview < 50 ? (
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      Requires invoice total ≥ $0.50 for online checkout.
+                    </span>
+                  ) : (
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      Uses your connected email app. Client must have a billing email (you can add it above).
+                    </span>
+                  )}
+                </span>
+              </label>
             </div>
             <DialogFooter className="bg-muted/30 px-5 py-4">
               <Button type="button" variant="ghost" className="h-12 rounded-xl font-semibold" onClick={closeModal} disabled={saving}>
