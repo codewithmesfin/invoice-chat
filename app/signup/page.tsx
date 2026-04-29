@@ -3,7 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { getAuthEmailRedirectUrl } from "@/lib/auth/email-redirect-url";
+import { friendlySignUpError } from "@/lib/auth/supabase-auth-messages";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,12 +27,19 @@ export default function SignupPage() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const { error: err } = await supabase.auth.signUp({ email, password });
+      const emailRedirectTo = getAuthEmailRedirectUrl();
+      const { error: err } = await supabase.auth.signUp({
+        email,
+        password,
+        options: emailRedirectTo ? { emailRedirectTo } : undefined,
+      });
       if (err) {
-        setError(err.message);
+        setError(friendlySignUpError(err));
         return;
       }
-      setInfo("Check your email to confirm, or sign in if confirmations are off.");
+      setInfo(
+        "Check your inbox for a confirmation link. After you confirm, you can sign in. If email confirmation is turned off for this project, you can sign in right away."
+      );
       router.refresh();
     } finally {
       setLoading(false);
@@ -52,7 +62,7 @@ export default function SignupPage() {
           <p className="text-sm text-slate-600">Free to start · takes about a minute</p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={onSubmit} className="space-y-4">
+          <form onSubmit={onSubmit} className="space-y-4" aria-busy={loading}>
             <div className="space-y-2">
               <Label htmlFor="email" className="text-slate-700">
                 Email
@@ -64,6 +74,7 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -78,16 +89,42 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
+                disabled={loading}
               />
             </div>
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
-            {info ? <p className="text-sm text-slate-600">{info}</p> : null}
+            {error ? (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+              >
+                {error}
+              </div>
+            ) : null}
+            {info ? (
+              <div
+                role="status"
+                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
+              >
+                {info}
+              </div>
+            ) : null}
             <Button type="submit" className="h-11 w-full rounded-lg font-semibold" disabled={loading}>
-              {loading ? "Creating…" : "Create account"}
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin" aria-hidden />
+                  Creating account…
+                </>
+              ) : (
+                "Create account"
+              )}
             </Button>
             <p className="text-center text-sm text-slate-600">
               Already have an account?{" "}
-              <Link href="/login" className="font-semibold text-primary hover:underline">
+              <Link
+                href="/login"
+                className={`font-semibold text-primary hover:underline ${loading ? "pointer-events-none opacity-50" : ""}`}
+                tabIndex={loading ? -1 : undefined}
+              >
                 Sign in
               </Link>
             </p>

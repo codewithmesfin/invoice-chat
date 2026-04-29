@@ -10,7 +10,7 @@ const items = [
   { href: "/customers", label: "Clients", icon: Users },
   { href: "/invoices", label: "Invoices", icon: FileText },
   { href: "/expenses", label: "Expenses", icon: Receipt },
-  { href: "/settings", label: "Profile", icon: Settings2 },
+  { href: "/settings", label: "Me", icon: Settings2 },
 ] as const;
 
 export function BottomNav() {
@@ -32,7 +32,7 @@ export function BottomNav() {
               key={href}
               href={href}
               className={cn(
-                "group relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-sm font-semibold tracking-tight text-muted-foreground transition-colors sm:text-sm",
+                "group relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-sm font-semibold tracking-tight text-muted-foreground transition-colors",
                 active && "text-primary"
               )}
             >

@@ -1,13 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { friendlySignInError } from "@/lib/auth/supabase-auth-messages";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+function readAuthErrorFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const q = new URLSearchParams(window.location.search).get("auth_error");
+    if (!q) return null;
+    return decodeURIComponent(q);
+  } catch {
+    return "Something went wrong with the sign-in link. Try signing in with your email and password.";
+  }
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +28,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fromUrl = readAuthErrorFromUrl();
+    if (fromUrl) {
+      setError(fromUrl);
+      const path = window.location.pathname;
+      window.history.replaceState({}, "", path);
+    }
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -27,7 +49,7 @@ export default function LoginPage() {
         password,
       });
       if (err) {
-        setError(err.message);
+        setError(friendlySignInError(err));
         return;
       }
       router.push("/chat");
@@ -53,7 +75,7 @@ export default function LoginPage() {
           <p className="text-sm text-slate-600">Welcome back to Invoice Copilot</p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={onSubmit} className="space-y-4">
+          <form onSubmit={onSubmit} className="space-y-4" aria-busy={loading}>
             <div className="space-y-2">
               <Label htmlFor="email" className="text-slate-700">
                 Email
@@ -65,6 +87,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -78,15 +101,34 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            {error ? (
+              <div
+                role="alert"
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+              >
+                {error}
+              </div>
+            ) : null}
             <Button type="submit" className="h-11 w-full rounded-lg font-semibold" disabled={loading}>
-              {loading ? "Signing in…" : "Continue"}
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin" aria-hidden />
+                  Signing in…
+                </>
+              ) : (
+                "Continue"
+              )}
             </Button>
             <p className="text-center text-sm text-slate-600">
               New here?{" "}
-              <Link href="/signup" className="font-semibold text-primary hover:underline">
+              <Link
+                href="/signup"
+                className={`font-semibold text-primary hover:underline ${loading ? "pointer-events-none opacity-50" : ""}`}
+                tabIndex={loading ? -1 : undefined}
+              >
                 Create an account
               </Link>
             </p>

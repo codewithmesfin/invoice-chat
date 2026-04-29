@@ -260,6 +260,12 @@ export function AgentChat() {
     }
   }, []);
 
+  /** Load list for desktop sidebar and keep history ready; do not wait for History drawer. */
+  useEffect(() => {
+    void fetchSessions();
+  }, [fetchSessions]);
+
+  /** Refresh when opening history so the drawer matches the server (e.g. other tabs). */
   useEffect(() => {
     if (historyOpen) void fetchSessions();
   }, [historyOpen, fetchSessions]);
@@ -404,6 +410,7 @@ export function AgentChat() {
         if (data.steps) setLastSteps(data.steps);
         setPendingReceipts([]);
         setReloadToken((t) => t + 1);
+        void fetchSessions();
       } catch (e) {
         window.clearTimeout(tid);
         if (e instanceof DOMException && e.name === "AbortError") {
@@ -418,7 +425,7 @@ export function AgentChat() {
         textareaRef.current?.focus();
       }
     },
-    [sessionId]
+    [sessionId, fetchSessions]
   );
 
   const send = useCallback(
@@ -632,14 +639,14 @@ export function AgentChat() {
                 <span className="lg:hidden">; use History to reopen them.</span>
                 <span className="hidden lg:inline">; on desktop, pick a thread in the list on the left.</span>
               </p>
-              <div className="mt-10 -mx-1 flex gap-2 overflow-x-auto pb-2 pt-1 sm:mx-0 sm:flex-wrap sm:justify-center">
+              <div className="mt-10 -mx-1 flex gap-2 pb-2 pt-1 sm:mx-0 flex-wrap justify-center">
                 {SUGGESTIONS.map((s) => (
                   <button
                     key={s}
                     type="button"
                     disabled={loading}
                     onClick={() => void send(s)}
-                    className="touch-manipulation [-webkit-tap-highlight-color:transparent] shrink-0 rounded-full border border-border/90 bg-card px-4 py-2.5 text-[15px] font-semibold text-foreground shadow-sm ring-1 ring-border/40 transition active:scale-[0.98] hover:border-primary/25 hover:bg-primary/[0.04] hover:shadow-md disabled:opacity-50"
+                    className="touch-manipulation [-webkit-tap-highlight-color:transparent] shrink-0 rounded-full border border-border/90 bg-card px-4 py-2.5 text-sm text-foreground shadow-sm ring-1 ring-border/40 transition active:scale-[0.98] hover:border-primary/25 hover:bg-primary/[0.04] hover:shadow-md disabled:opacity-50"
                   >
                     {s}
                   </button>
