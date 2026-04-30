@@ -4,9 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { getAuthEmailRedirectUrl } from "@/lib/auth/email-redirect-url";
 import { friendlySignUpError } from "@/lib/auth/supabase-auth-messages";
+import { parseJsonSafe, type ApiErrorBody } from "@/lib/http/api-user-message";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,15 +25,21 @@ export default function SignupPage() {
     setInfo(null);
     setLoading(true);
     try {
-      const supabase = createClient();
-      const emailRedirectTo = getAuthEmailRedirectUrl();
-      const { error: err } = await supabase.auth.signUp({
-        email,
-        password,
-        options: emailRedirectTo ? { emailRedirectTo } : undefined,
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
-      if (err) {
-        setError(friendlySignUpError(err));
+      const raw = await parseJsonSafe(res);
+      const body = (raw ?? {}) as { ok?: boolean; message?: string; error?: string } & ApiErrorBody;
+      if (!res.ok) {
+        const msg =
+          typeof body.message === "string" && body.message.trim()
+            ? body.message
+            : typeof body.error === "string"
+              ? body.error
+              : "Sign up failed.";
+        setError(friendlySignUpError({ message: msg, status: res.status }));
         return;
       }
       setInfo(
