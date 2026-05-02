@@ -50,31 +50,80 @@ export function publicUrlFromRequest(req: Request): string | null {
   }
 }
 
+function originOrRefererOrigin(req: Request): string | null {
+  const origin = req.headers.get("origin")?.trim();
+  if (origin) {
+    try {
+      return new URL(origin).origin;
+    } catch {
+      /* ignore */
+    }
+  }
+  const referer = req.headers.get("referer")?.trim();
+  if (referer) {
+    try {
+      return new URL(referer).origin;
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
+}
+
 /**
- * Resolves public site origin. Pass `request` from API route handlers so pay links
- * match the domain the user is on (custom domain, Vercel preview, etc.).
+ * Resolves public site origin. Pass `request` from API route handlers so pay links,
+ * Stripe redirects, invoice emails, and auth `emailRedirectTo` match the domain the
+ * user is on (custom domain, Vercel preview, etc.).
  */
 export function resolvePublicAppUrl(opts?: { request?: Request }): string | null {
   const req = opts?.request;
 
-  const serverCanonical = process.env.APP_URL?.trim() || process.env.SERVER_APP_URL?.trim();
-  if (serverCanonical) {
-    return stripOrigin(serverCanonical);
-  }
-
-  const fromReq = req ? publicUrlFromRequest(req) : null;
-  if (fromReq && !looksLikeLocalhost(fromReq)) {
-    return fromReq;
-  }
-
-  const nextRaw = process.env.NEXT_PUBLIC_APP_URL?.trim() ?? "";
+  // In production, always prefer APP_URL over request headers to ensure consistency
+  // Across Vercel/Vercel Preview deployments, the host header might vary
   const isProd =
     process.env.NODE_ENV === "production" ||
     process.env.VERCEL === "1" ||
     !!process.env.RAILWAY_ENVIRONMENT ||
     !!process.env.RENDER;
 
-  if (nextRaw && !(isProd && looksLikeLocalhost(nextRaw))) {
+  const serverCanonical = process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.SERVER_APP_URL?.trim();
+  if (serverCanonical) {
+    const resolved = stripOrigin(serverCanonical);
+    // In production, always use APP_URL even if it looks like localhost
+    // This catches misconfigurations (APP_URL might incorrectly point to localhost)
+    if (isProd && looksLikeLocalhost(resolved)) {
+      console.warn("APP_URL points to localhost in production - check configuration");
+    }
+    // In production, prefer APP_URL over request host for consistency
+    if (isProd) {
+      return resolved;
+    }
+  }
+
+  const fromReq = req ? publicUrlFromRequest(req) : null;
+
+  // Prefer the live request host (same idea as Stripe / invoice links) so prod never
+  // uses localhost from APP_URL or NEXT_PUBLIC_APP_URL when the user is on a real domain.
+  if (fromReq && !looksLikeLocalhost(fromReq)) {
+    return fromReq;
+  }
+  if (serverCanonical) {
+    return stripOrigin(serverCanonical);
+  }
+
+  const fromMeta = req ? originOrRefererOrigin(req) : null;
+  if (fromMeta && !looksLikeLocalhost(fromMeta)) {
+    return fromMeta;
+  }
+
+  const nextRaw = process.env.NEXT_PUBLIC_APP_URL?.trim() ?? "";
+  const isProd2 =
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL === "1" ||
+    !!process.env.RAILWAY_ENVIRONMENT ||
+    !!process.env.RENDER;
+
+  if (nextRaw && !(isProd2 && looksLikeLocalhost(nextRaw))) {
     return stripOrigin(nextRaw);
   }
 
@@ -105,6 +154,18 @@ export function resolvePublicAppUrl(opts?: { request?: Request }): string | null
 
   if (fromReq) {
     return fromReq;
+  }
+
+  if (fromMeta) {
+    return fromMeta;
+  }
+
+  try {
+    if (req) {
+      return new URL(req.url).origin;
+    }
+  } catch {
+    /* ignore */
   }
 
   return null;

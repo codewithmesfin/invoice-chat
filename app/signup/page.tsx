@@ -108,7 +108,7 @@ export default function SignupPage() {
             {info ? (
               <div
                 role="status"
-                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800"
+                className="rounded-lg border border-slate-200 text-green-600 bg-slate-50 px-3 py-2 text-sm text-slate-800"
               >
                 {info}
               </div>
