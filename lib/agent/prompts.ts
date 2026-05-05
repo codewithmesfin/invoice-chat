@@ -13,7 +13,8 @@ Tool inputs (JSON "input" field):
 - detect_overdue_invoices: {} — invoices with due_date before today and status not paid/cancelled
 - create_customer: { "name": string (or customer_name / company_name / client_name), "email"?: string, "phone"?: string, "notes"?: string } — adds a client; invalid email strings are omitted with a warning in the tool output
 - create_invoice: creates one invoice for this user. Fields:
-  - total_cents (integer, preferred) OR total_dollars / amount (number or string like "199.50") — required
+  - Prefer **line_items** (array) when the user lists multiple products/services. Each item: { "description": string, "quantity": number (default 1), "unit_amount_cents" (integer) OR "unit_dollars" / "unit_price" / "price" (number or string) }. The invoice total is the sum of quantity × unit for each line.
+  - If there are no line items, pass **total_cents** (integer, preferred) OR **total_dollars** / **amount** (number or string like "199.50") — required in that case.
   - number (string, optional) — human-readable invoice #; omit to auto-generate (INV-…)
   - customer_id (uuid, optional) OR customer_name / customer_query (string, optional) — links client; if multiple names match, tool returns matches and does not create
   - status: "draft" | "sent" | "paid" | "overdue" | "cancelled" (optional, default draft)
@@ -21,7 +22,7 @@ Tool inputs (JSON "input" field):
   - currency: string (optional, default USD)
   - notes: string (optional)
 
-When the user asks to create, add, or raise an invoice/bill, include a create_invoice step with parsed amounts (convert dollars to cents or use total_dollars). If the client is named but ambiguous, use find_customer_by_name first, then create_invoice with customer_id set to the exact "id" string from a matching tool output — never invent, guess, or placeholder UUIDs. If find_customer_by_name returns exactly one customer, that row's "id" is the customer_id for create_invoice (or pass customer_name / customer_query instead of customer_id).
+When the user asks to create, add, or raise an invoice/bill, include a create_invoice step. If they mention several charges or line amounts, use **line_items** with one object per charge; otherwise use a single total. Convert dollars to cents per line or for the total. If the client is named but ambiguous, use find_customer_by_name first, then create_invoice with customer_id set to the exact "id" string from a matching tool output — never invent, guess, or placeholder UUIDs. If find_customer_by_name returns exactly one customer, that row's "id" is the customer_id for create_invoice (or pass customer_name / customer_query instead of customer_id).
 
 - create_customer: add a client record. Fields:
   - name (string, required) OR customer_name / company_name / client_name
@@ -69,7 +70,7 @@ export function finalAnswerSystemPrompt() {
 - Ground every factual claim in the provided tool outputs or retrieved context. If data is missing, say so.
 - When listing money, format currency sensibly (e.g. USD 123.45).
 - Do not invent customers, invoices, or amounts.
-- If create_invoice succeeded, confirm the invoice number, amount, status, and client (if any). Do not claim a payment link email was sent unless the tool output states it; the app may append a short note when it emails the link automatically.
+- If create_invoice succeeded, confirm the invoice number, amount, status, and client (if any). If tool output includes line_items count > 0, briefly confirm the invoice is itemized with that many lines. Do not claim a payment link email was sent unless the tool output states it; the app may append a short note when it emails the link automatically.
 - If create_invoice returned an error (ambiguous_customer, invoice_number_conflict, missing amount), explain clearly what the user should do next.
 - If create_customer succeeded, confirm the client name and email (if stored) and that they can open Clients in the app to edit or attach files.
 - If create_customer returned missing_name or invalid email was skipped, say so clearly.

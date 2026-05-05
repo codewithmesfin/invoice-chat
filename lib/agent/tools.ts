@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ToolName } from "@/lib/agent/types";
 import { syncCustomerEmbedding, syncInvoiceEmbedding } from "@/lib/embeddings/sync-entity";
 import { pickExpenseCentsFromBody } from "@/lib/expenses/parse-amount";
+import { insertInvoiceLineItems, sumLineItemsCents } from "@/lib/invoices/invoice-line-items-write";
+import { parseToolInvoiceLineItems } from "@/lib/invoices/parse-tool-line-items";
 
 export type ToolContext = {
   supabase: SupabaseClient;
@@ -225,11 +227,19 @@ async function resolveCustomerId(
 }
 
 async function createInvoice(ctx: ToolContext, input: Record<string, unknown>) {
-  const total_cents = pickTotalCents(input);
+  const parsedLines = parseToolInvoiceLineItems(input);
+
+  let total_cents: number | null = null;
+  if (parsedLines && parsedLines.length > 0) {
+    total_cents = sumLineItemsCents(parsedLines);
+  } else {
+    total_cents = pickTotalCents(input);
+  }
+
   if (total_cents === null) {
     return {
       error:
-        "Missing amount. Pass total_cents (integer cents) or total_dollars / amount (e.g. 199.50).",
+        "Missing amount. Pass line_items (array of { description, quantity, unit_amount_cents or unit_dollars }) or total_cents / total_dollars / amount.",
     };
   }
 
@@ -291,8 +301,18 @@ async function createInvoice(ctx: ToolContext, input: Record<string, unknown>) {
     throw new Error(error.message);
   }
 
+  const invoiceId = data.id as string;
+
+  if (parsedLines && parsedLines.length > 0) {
+    const { error: lineErr } = await insertInvoiceLineItems(ctx.supabase, invoiceId, parsedLines);
+    if (lineErr) {
+      await ctx.supabase.from("invoices").delete().eq("id", invoiceId).eq("user_id", ctx.userId);
+      return { error: "line_items_failed", message: lineErr };
+    }
+  }
+
   try {
-    await syncInvoiceEmbedding(ctx.supabase, ctx.userId, data.id as string);
+    await syncInvoiceEmbedding(ctx.supabase, ctx.userId, invoiceId);
   } catch {
     /* best-effort */
   }
@@ -301,6 +321,7 @@ async function createInvoice(ctx: ToolContext, input: Record<string, unknown>) {
     created: true,
     invoice: data,
     resolution_note,
+    line_items: parsedLines?.length ?? 0,
   };
 }
 

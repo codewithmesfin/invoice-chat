@@ -36,7 +36,7 @@ function layout(inner: string, branding: InvoiceEmailBranding) {
             </td>
           </tr>
           <tr>
-            <td style="padding:0 28px 24px 28px;font-size:12px;line-height:1.5;color:#94a3b8;">
+            <td style="padding:0 28px 24px 28px;font-size:12px;line-height:1.5;color:${INVOICE_PRINT.muted};">
               If you were not expecting this message, you can ignore it.
             </td>
           </tr>
@@ -103,7 +103,7 @@ export function buildInvoiceEmailDocumentSection(opts: {
     .join("");
 
   const billEmail = opts.billToEmail
-    ? `<div style="margin-top:4px;font-size:12px;color:#64748b;">${escapeHtml(opts.billToEmail)}</div>`
+    ? `<div style="margin-top:4px;font-size:12px;color:${p.muted};">${escapeHtml(opts.billToEmail)}</div>`
     : "";
 
   const issued = opts.issuedDateLabel ? escapeHtml(opts.issuedDateLabel) : "—";
@@ -114,12 +114,12 @@ export function buildInvoiceEmailDocumentSection(opts: {
          <tr>
            <td style="vertical-align:top;width:62%;padding-right:12px;">
              <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;color:${p.label};text-transform:uppercase;">Terms and condition</div>
-             <div style="margin-top:6px;font-size:12px;line-height:1.55;color:#64748b;white-space:pre-wrap;">${escapeHtml(opts.notesPreview)}</div>
+             <div style="margin-top:6px;font-size:12px;line-height:1.55;color:${p.muted};white-space:pre-wrap;">${escapeHtml(opts.notesPreview)}</div>
            </td>
            <td style="vertical-align:bottom;text-align:right;padding-left:8px;">
              <div style="border-bottom:1px solid ${p.ink};min-width:140px;margin-left:auto;margin-bottom:6px;"></div>
              <div style="font-size:12px;font-weight:700;color:${p.ink};">${escapeHtml(branding.appName)}</div>
-             <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;color:#64748b;text-transform:uppercase;margin-top:3px;">Authorized signature</div>
+             <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;color:${p.label};text-transform:uppercase;margin-top:3px;">Authorized signature</div>
            </td>
          </tr>
        </table>`
@@ -133,7 +133,7 @@ export function buildInvoiceEmailDocumentSection(opts: {
         <tr>
           <td style="vertical-align:top;width:55%;">
             <span style="display:inline-block;width:9px;height:9px;background:${p.ink};margin-right:4px;"></span><span style="display:inline-block;width:9px;height:9px;background:${p.ink};margin-right:4px;"></span><span style="display:inline-block;width:9px;height:9px;background:${p.ink};"></span>
-            <div style="margin-top:10px;font-size:12px;font-weight:600;color:#64748b;">${escapeHtml(branding.appName)}</div>
+            <div style="margin-top:10px;font-size:12px;font-weight:600;color:${p.muted};">${escapeHtml(branding.appName)}</div>
           </td>
           <td style="vertical-align:top;text-align:right;">
             <div style="font-size:20px;font-weight:800;color:${p.ink};line-height:1.1;">INVOICE</div>
@@ -176,7 +176,7 @@ export function buildInvoiceEmailDocumentSection(opts: {
           <td align="right" style="padding:8px 0 0 0;">
             <table role="presentation" cellspacing="0" cellpadding="0" style="margin-left:auto;">
               <tr>
-                <td style="padding:4px 12px 4px 0;font-size:11px;color:#64748b;text-transform:uppercase;">Sub total:</td>
+                <td style="padding:4px 12px 4px 0;font-size:11px;color:${p.muted};text-transform:uppercase;">Sub total:</td>
                 <td style="padding:4px 0;font-size:14px;font-weight:600;color:${p.ink};text-align:right;">${escapeHtml(formatMoneyEmail(subtotalCents, opts.currency))}</td>
               </tr>
               <tr><td colspan="2" style="border-top:1px solid ${p.border};height:8px;"></td></tr>
@@ -233,11 +233,11 @@ export function buildInvoiceLinkEmail(opts: {
     <p style="margin:24px 0 16px 0;text-align:center;">
       <a href="${escapeHtml(opts.payUrl)}" style="display:inline-block;padding:14px 28px;background:${b.accentColor};color:#ffffff;text-decoration:none;border-radius:999px;font-weight:600;font-size:15px;">Pay securely</a>
     </p>
-    <p style="margin:0 0 12px 0;font-size:13px;color:#64748b;text-align:center;">View, print, or save from your browser:</p>
+    <p style="margin:0 0 12px 0;font-size:13px;color:${INVOICE_PRINT.muted};text-align:center;">View, print, or save from your browser:</p>
     <p style="margin:0 0 16px 0;font-size:13px;text-align:center;">
       <a href="${escapeHtml(opts.payUrl)}" style="color:${b.accentColor};font-weight:600;text-decoration:underline;">Open invoice page</a>
     </p>
-    <p style="margin:0;font-size:13px;color:#64748b;">Or copy this link:<br /><span style="word-break:break-all;color:#0f172a;">${escapeHtml(opts.payUrl)}</span></p>
+    <p style="margin:0;font-size:13px;color:${INVOICE_PRINT.muted};">Or copy this link:<br /><span style="word-break:break-all;color:#0f172a;">${escapeHtml(opts.payUrl)}</span></p>
   `;
   return {
     subject: `Invoice #${opts.invoiceNumber} — ${opts.amountLabel}`,
@@ -286,11 +286,11 @@ export function buildInvoiceReminderEmail(opts: {
     <p style="margin:24px 0 16px 0;text-align:center;">
       <a href="${escapeHtml(opts.payUrl)}" style="display:inline-block;padding:14px 28px;background:${b.accentColor};color:#ffffff;text-decoration:none;border-radius:999px;font-weight:600;font-size:15px;">Pay now</a>
     </p>
-    <p style="margin:0 0 12px 0;font-size:13px;color:#64748b;text-align:center;">View, print, or save from your browser:</p>
+    <p style="margin:0 0 12px 0;font-size:13px;color:${INVOICE_PRINT.muted};text-align:center;">View, print, or save from your browser:</p>
     <p style="margin:0 0 16px 0;font-size:13px;text-align:center;">
       <a href="${escapeHtml(opts.payUrl)}" style="color:${b.accentColor};font-weight:600;text-decoration:underline;">Open invoice page</a>
     </p>
-    <p style="margin:0;font-size:13px;color:#64748b;">If you already paid, thank you — you can disregard this email.</p>
+    <p style="margin:0;font-size:13px;color:${INVOICE_PRINT.muted};">If you already paid, thank you — you can disregard this email.</p>
   `;
   return {
     subject: `Reminder: Invoice #${opts.invoiceNumber}`,

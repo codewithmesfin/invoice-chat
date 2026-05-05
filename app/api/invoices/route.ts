@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { syncInvoiceEmbedding } from "@/lib/embeddings/sync-entity";
+import { insertInvoiceLineItems, sumLineItemsCents, type InvoiceLineItemInsert } from "@/lib/invoices/invoice-line-items-write";
+
+const LineItemSchema = z.object({
+  description: z.string().min(1).max(500),
+  quantity: z.coerce.number().refine((n) => Number.isFinite(n) && n > 0, "quantity must be positive"),
+  unit_amount_cents: z.number().int().min(0),
+});
 
 const PostSchema = z.object({
   customer_id: z.string().uuid().nullable().optional(),
@@ -14,6 +21,7 @@ const PostSchema = z.object({
   currency: z.string().min(1).max(8).optional().default("USD"),
   total_cents: z.number().int().min(0).optional().default(0),
   notes: z.string().max(2000).optional(),
+  line_items: z.array(LineItemSchema).optional(),
 });
 
 export async function GET() {
@@ -54,6 +62,14 @@ export async function POST(req: Request) {
   }
 
   const row = parsed.data;
+  const lines: InvoiceLineItemInsert[] = (row.line_items ?? []).map((l) => ({
+    description: l.description,
+    quantity: l.quantity,
+    unit_amount_cents: l.unit_amount_cents,
+  }));
+  const total_cents =
+    lines.length > 0 ? sumLineItemsCents(lines) : row.total_cents ?? 0;
+
   const { data, error } = await supabase
     .from("invoices")
     .insert({
@@ -63,7 +79,7 @@ export async function POST(req: Request) {
       status: row.status,
       due_date: row.due_date ?? null,
       currency: row.currency,
-      total_cents: row.total_cents,
+      total_cents,
       notes: row.notes ?? null,
     })
     .select("id")
@@ -71,6 +87,14 @@ export async function POST(req: Request) {
 
   if (error || !data) {
     return NextResponse.json({ error: error?.message ?? "Insert failed" }, { status: 500 });
+  }
+
+  if (lines.length > 0) {
+    const { error: lineErr } = await insertInvoiceLineItems(supabase, data.id, lines);
+    if (lineErr) {
+      await supabase.from("invoices").delete().eq("id", data.id).eq("user_id", user.id);
+      return NextResponse.json({ error: lineErr }, { status: 500 });
+    }
   }
 
   try {

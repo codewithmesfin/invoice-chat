@@ -158,7 +158,7 @@ export function PayInvoiceClient({
                 <span className="size-2.5 rounded-sm" style={{ background: T.ink }} aria-hidden />
                 <span className="size-2.5 rounded-sm" style={{ background: T.ink }} aria-hidden />
               </div>
-              <p className="mt-4 text-sm font-semibold text-slate-600">{issuerName}</p>
+              <p className="mt-4 text-sm font-semibold text-slate-800">{issuerName}</p>
             </div>
             <div className="text-right">
               <p className="text-2xl font-extrabold leading-none tracking-tight text-slate-900 sm:text-3xl">INVOICE</p>
@@ -176,7 +176,11 @@ export function PayInvoiceClient({
               {preparedName || preparedEmail ? (
                 <div className="mt-2 text-[15px] font-semibold leading-snug text-slate-900">
                   {preparedName ? <p>{preparedName}</p> : null}
-                  {preparedEmail ? <p className="mt-0.5 text-sm font-medium text-slate-500">{preparedEmail}</p> : null}
+                  {preparedEmail ? (
+                    <p className="mt-0.5 text-sm font-medium" style={{ color: T.muted }}>
+                      {preparedEmail}
+                    </p>
+                  ) : null}
                 </div>
               ) : (
                 <p className="mt-2 text-sm" style={{ color: T.label }}>
@@ -248,7 +252,9 @@ export function PayInvoiceClient({
           <div className="mt-4 flex justify-end">
             <div className="w-full max-w-[280px] space-y-1">
               <div className="flex justify-between gap-4 text-sm">
-                <span className="uppercase tracking-wide text-slate-500">Sub total:</span>
+                <span className="uppercase tracking-wide" style={{ color: T.muted }}>
+                  Sub total:
+                </span>
                 <span className="font-semibold tabular-nums text-slate-900">
                   {formatMoney(subtotalCents, view.currency)}
                 </span>
@@ -272,7 +278,7 @@ export function PayInvoiceClient({
                 <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: T.label }}>
                   Terms and condition
                 </p>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{view.notes_preview}</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{view.notes_preview}</p>
               </div>
             ) : (
               <div className="flex-1 print:block" aria-hidden />
@@ -280,7 +286,7 @@ export function PayInvoiceClient({
             <div className="shrink-0 text-right sm:min-w-[220px]">
               <div className="ml-auto border-b border-slate-900 pb-1" style={{ maxWidth: 220 }} />
               <p className="mt-3 text-sm font-bold text-slate-900">{issuerName}</p>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: T.label }}>
                 Authorized signature
               </p>
             </div>
@@ -317,7 +323,7 @@ export function PayInvoiceClient({
             ) : null}
           </div>
           {state === "open" ? (
-            <p className="mt-4 text-center text-xs text-slate-500 sm:text-left">
+            <p className="mt-4 text-center text-xs text-slate-600 sm:text-left">
               You will complete payment on Stripe. Card details are not stored on this site.
             </p>
           ) : null}

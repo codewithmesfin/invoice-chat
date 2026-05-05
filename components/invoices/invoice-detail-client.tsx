@@ -56,6 +56,14 @@ type Attachment = {
   extracted_text: string | null;
 };
 
+type InvoiceLineRow = {
+  id: string;
+  description: string;
+  quantity: number;
+  unit_amount_cents: number;
+  sort_order: number;
+};
+
 type TimelineRow = {
   id: string;
   at: string;
@@ -70,6 +78,11 @@ function money(cents: number, currency: string) {
   } catch {
     return `${(cents / 100).toFixed(2)} ${currency}`;
   }
+}
+
+function formatQtyDisplay(q: number) {
+  if (Number.isInteger(q)) return String(q);
+  return String(q);
 }
 
 function paymentBadge(status: string | null | undefined) {
@@ -110,6 +123,7 @@ function backLink() {
 
 export function InvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
+  const [lineItems, setLineItems] = useState<InvoiceLineRow[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [timeline, setTimeline] = useState<TimelineRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,8 +150,13 @@ export function InvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
       setLoading(false);
       return;
     }
-    const invJson = (await invRes.json()) as { invoice: InvoiceDetail; attachments: Attachment[] };
+    const invJson = (await invRes.json()) as {
+      invoice: InvoiceDetail;
+      attachments: Attachment[];
+      line_items?: InvoiceLineRow[];
+    };
     setInvoice(invJson.invoice);
+    setLineItems(invJson.line_items ?? []);
     setAttachments(invJson.attachments ?? []);
 
     if (auditRes.ok) {
@@ -376,6 +395,10 @@ export function InvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
     return parts.join(" · ");
   }, [invoice]);
 
+  const linesSubtotalCents = useMemo(() => {
+    return lineItems.reduce((acc, row) => acc + Math.round(Number(row.quantity) * row.unit_amount_cents), 0);
+  }, [lineItems]);
+
   if (loading && !invoice) {
     return (
       <div className="flex w-full flex-col gap-6">
@@ -450,6 +473,77 @@ export function InvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
           </div>
         </div>
       </div>
+
+      {lineItems.length > 0 ? (
+        <Card>
+          <CardHeader className="border-b border-border/70 pb-4">
+            <CardTitle className="text-lg font-bold">Line items</CardTitle>
+            <CardDescription>
+              {linesSubtotalCents !== invoice.total_cents ? (
+                <span className="text-amber-900">
+                  Line math ({money(linesSubtotalCents, invoice.currency)}) differs from invoice total — balance shown
+                  above is authoritative.
+                </span>
+              ) : (
+                "Each row bills quantity × unit price."
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="overflow-x-auto rounded-xl border border-border/80">
+              <table className="w-full min-w-[520px] border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40 text-left">
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-700">#</th>
+                    <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-700">
+                      Description
+                    </th>
+                    <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wide text-slate-700">
+                      Qty
+                    </th>
+                    <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wide text-slate-700">
+                      Unit
+                    </th>
+                    <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wide text-slate-700">
+                      Amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lineItems.map((row, idx) => {
+                    const lineTotal = Math.round(Number(row.quantity) * row.unit_amount_cents);
+                    return (
+                      <tr key={row.id} className="border-b border-border/60 last:border-0">
+                        <td className="px-4 py-3 tabular-nums text-muted-foreground">{idx + 1}</td>
+                        <td className="px-4 py-3 font-medium text-foreground">{row.description}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-foreground">
+                          {formatQtyDisplay(Number(row.quantity))}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums text-foreground">
+                          {money(row.unit_amount_cents, invoice.currency)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold tabular-nums text-foreground">
+                          {money(lineTotal, invoice.currency)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-dashed">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-bold">Line items</CardTitle>
+            <CardDescription>
+              No detailed lines were stored for this invoice — total is a single amount. New invoices created from the
+              app or chat include itemized lines.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
 
       {error ? (
         <p className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">

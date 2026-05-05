@@ -37,7 +37,17 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
-  return NextResponse.json({ invoice: inv, attachments: attachments ?? [] });
+  const { data: lineItems } = await supabase
+    .from("invoice_line_items")
+    .select("id,description,quantity,unit_amount_cents,sort_order")
+    .eq("invoice_id", id)
+    .order("sort_order", { ascending: true });
+
+  return NextResponse.json({
+    invoice: inv,
+    attachments: attachments ?? [],
+    line_items: lineItems ?? [],
+  });
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {

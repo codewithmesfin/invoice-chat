@@ -61,7 +61,7 @@ export function buildStandaloneInvoiceHtml(opts: StandaloneInvoiceHtmlOpts): str
       ? `<div style="margin-top:6px;font-size:15px;font-weight:600;color:${p.ink};line-height:1.5;">
            ${opts.billToName ? escapeHtml(opts.billToName) : ""}
            ${opts.billToName && opts.billToEmail ? "<br/>" : ""}
-           ${opts.billToEmail ? `<span style="font-weight:500;color:#64748b;font-size:14px;">${escapeHtml(opts.billToEmail)}</span>` : ""}
+           ${opts.billToEmail ? `<span style="font-weight:500;color:${p.muted};font-size:14px;">${escapeHtml(opts.billToEmail)}</span>` : ""}
          </div>`
       : `<span style="color:${p.label};">—</span>`;
 
@@ -71,7 +71,7 @@ export function buildStandaloneInvoiceHtml(opts: StandaloneInvoiceHtmlOpts): str
   const termsBlock = opts.notes
     ? `<div style="margin-top:32px;padding-top:20px;border-top:1px solid ${p.border};max-width:62%;">
          <div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:${p.label};text-transform:uppercase;">Terms and condition</div>
-         <div style="margin-top:10px;font-size:12px;line-height:1.65;color:#64748b;white-space:pre-wrap;">${escapeHtml(opts.notes)}</div>
+         <div style="margin-top:10px;font-size:12px;line-height:1.65;color:${p.muted};white-space:pre-wrap;">${escapeHtml(opts.notes)}</div>
        </div>`
     : "";
 
@@ -90,7 +90,7 @@ export function buildStandaloneInvoiceHtml(opts: StandaloneInvoiceHtmlOpts): str
   </style>
 </head>
 <body style="margin:0;background:#f8fafc;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:${p.ink};padding:24px 16px;">
-  <p class="no-print" style="margin:0 0 16px 0;font-size:13px;color:#64748b;">Use <strong>Print</strong> to print or save as PDF.</p>
+  <p class="no-print" style="margin:0 0 16px 0;font-size:13px;color:${p.muted};">Use <strong>Print</strong> to print or save as PDF.</p>
   <div class="sheet" style="max-width:800px;margin:0 auto;background:#ffffff;border:1px solid ${p.border};border-radius:4px;overflow:hidden;box-shadow:0 4px 24px rgba(15,23,42,0.06);">
     <div style="height:14px;background:${p.topBar};"></div>
     <div style="padding:36px 40px 8px 40px;">
@@ -102,7 +102,7 @@ export function buildStandaloneInvoiceHtml(opts: StandaloneInvoiceHtmlOpts): str
               <span style="display:inline-block;width:11px;height:11px;background:${p.ink};margin-right:5px;vertical-align:middle;"></span>
               <span style="display:inline-block;width:11px;height:11px;background:${p.ink};vertical-align:middle;"></span>
             </div>
-            <div style="margin-top:16px;font-size:13px;color:#64748b;font-weight:600;">${escapeHtml(opts.fromName)}</div>
+            <div style="margin-top:16px;font-size:13px;color:${p.muted};font-weight:600;">${escapeHtml(opts.fromName)}</div>
           </td>
           <td style="vertical-align:top;text-align:right;">
             <div style="font-size:28px;font-weight:800;letter-spacing:-0.02em;color:${p.ink};line-height:1.1;">INVOICE</div>
@@ -147,7 +147,7 @@ export function buildStandaloneInvoiceHtml(opts: StandaloneInvoiceHtmlOpts): str
           <td align="right" style="padding:20px 0 0 0;">
             <table role="presentation" cellspacing="0" cellpadding="0" style="margin-left:auto;min-width:260px;">
               <tr>
-                <td style="padding:6px 16px 6px 0;font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;">Sub total:</td>
+                <td style="padding:6px 16px 6px 0;font-size:13px;color:${p.muted};text-transform:uppercase;letter-spacing:0.04em;">Sub total:</td>
                 <td style="padding:6px 0;font-size:15px;font-weight:600;color:${p.ink};text-align:right;white-space:nowrap;">${escapeHtml(formatMoney(subtotalCents, opts.currency))}</td>
               </tr>
               <tr>
@@ -168,7 +168,7 @@ export function buildStandaloneInvoiceHtml(opts: StandaloneInvoiceHtmlOpts): str
           <td style="vertical-align:bottom;text-align:right;padding-left:24px;">
             <div style="border-bottom:1px solid ${p.ink};min-width:200px;margin-left:auto;margin-bottom:8px;height:1px;"></div>
             <div style="font-size:13px;font-weight:700;color:${p.ink};">${escapeHtml(opts.fromName)}</div>
-            <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;color:#64748b;text-transform:uppercase;margin-top:4px;">Authorized signature</div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;color:${p.label};text-transform:uppercase;margin-top:4px;">Authorized signature</div>
           </td>
         </tr>
       </table>

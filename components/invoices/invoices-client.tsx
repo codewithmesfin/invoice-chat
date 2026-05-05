@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight, FileText, Plus } from "lucide-react";
+import { ChevronRight, FileText, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -22,6 +22,16 @@ import { friendlyUserMessage, parseJsonSafe, type ApiErrorBody } from "@/lib/htt
 import { cn } from "@/lib/utils";
 
 const NEW_CLIENT_VALUE = "__new__";
+
+type DraftLine = { key: string; description: string; quantity: string; unitDollars: string };
+
+function newDraftLine(): DraftLine {
+  const key =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `ln-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return { key, description: "", quantity: "1", unitDollars: "" };
+}
 
 type Customer = { id: string; name: string; email: string | null; phone?: string | null };
 
@@ -65,16 +75,23 @@ export function InvoicesClient() {
   const [number, setNumber] = useState("");
   const [status, setStatus] = useState("draft");
   const [due, setDue] = useState("");
-  const [total, setTotal] = useState("");
+  const [lineRows, setLineRows] = useState<DraftLine[]>(() => [newDraftLine()]);
   const [notes, setNotes] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const totalCentsPreview = useMemo(() => {
-    const d = Number.parseFloat(total || "0");
-    if (Number.isNaN(d)) return 0;
-    return Math.max(0, Math.round(d * 100));
-  }, [total]);
+    let cents = 0;
+    for (const row of lineRows) {
+      const desc = row.description.trim();
+      if (!desc) continue;
+      const qty = Number.parseFloat(row.quantity || "1");
+      const unit = Number.parseFloat(row.unitDollars || "0");
+      if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(unit) || unit < 0) continue;
+      cents += Math.round(qty * unit * 100);
+    }
+    return Math.max(0, cents);
+  }, [lineRows]);
 
   const selectedCustomer = useMemo(
     () => (clientChoice && clientChoice !== NEW_CLIENT_VALUE ? customers.find((c) => c.id === clientChoice) : undefined),
@@ -127,7 +144,7 @@ export function InvoicesClient() {
     setSendAfterCreate(false);
     setNumber("");
     setDue("");
-    setTotal("");
+    setLineRows([newDraftLine()]);
     setNotes("");
     setStatus("draft");
     setModalOpen(true);
@@ -144,12 +161,36 @@ export function InvoicesClient() {
     setFormError(null);
     setSaving(true);
     try {
-      const dollars = Number.parseFloat(total || "0");
-      const total_cents = Math.round(dollars * 100);
       if (!number.trim()) {
         setFormError("Invoice number is required.");
         return;
       }
+
+      const line_items: { description: string; quantity: number; unit_amount_cents: number }[] = [];
+      for (const row of lineRows) {
+        const desc = row.description.trim();
+        if (!desc) continue;
+        const qty = Number.parseFloat(row.quantity || "1");
+        const unit = Number.parseFloat(row.unitDollars || "0");
+        if (!Number.isFinite(qty) || qty <= 0) {
+          setFormError("Each line needs a valid quantity greater than zero.");
+          return;
+        }
+        if (!Number.isFinite(unit) || unit < 0) {
+          setFormError("Each line needs a valid unit price (0 or more).");
+          return;
+        }
+        line_items.push({
+          description: desc,
+          quantity: qty,
+          unit_amount_cents: Math.round(unit * 100),
+        });
+      }
+      if (line_items.length === 0) {
+        setFormError("Add at least one line item with a description and unit price.");
+        return;
+      }
+      const total_cents = line_items.reduce((s, l) => s + Math.round(l.quantity * l.unit_amount_cents), 0);
 
       let resolvedCustomerId: string | null = null;
 
@@ -239,7 +280,7 @@ export function InvoicesClient() {
           number,
           status,
           due_date: due || null,
-          total_cents,
+          line_items,
           notes: notes || undefined,
         }),
       });
@@ -281,7 +322,7 @@ export function InvoicesClient() {
 
       setNumber("");
       setDue("");
-      setTotal("");
+      setLineRows([newDraftLine()]);
       setNotes("");
       setClientChoice("");
       setNewClientName("");
@@ -357,7 +398,7 @@ export function InvoicesClient() {
             <EmptyState
               icon={<FileText className="size-7 text-primary" strokeWidth={1.5} />}
               title="No invoices yet"
-              description="Create an invoice in seconds — add a number, amount, and client. Payment links and files live on the detail page."
+              description="Create an invoice with one or more line items, a number, and optional client. Payment links and files live on the detail page."
               action={
                 <Button type="button" onClick={openModal} className="rounded-full px-6 font-semibold shadow-sm">
                   New invoice
@@ -567,18 +608,97 @@ export function InvoicesClient() {
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="inv-tot" className="text-sm font-semibold text-foreground">
-                  Total (USD)
-                </Label>
-                <Input
-                  id="inv-tot"
-                  inputMode="decimal"
-                  className="h-12 rounded-xl text-base"
-                  placeholder="0.00"
-                  value={total}
-                  onChange={(e) => setTotal(e.target.value)}
-                />
+              <div className="space-y-3">
+                <div className="flex items-end justify-between gap-2">
+                  <Label className="text-sm font-semibold text-foreground">Line items</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-1 rounded-lg font-semibold"
+                    onClick={() => setLineRows((rows) => [...rows, newDraftLine()])}
+                  >
+                    <Plus className="size-4" aria-hidden />
+                    Add line
+                  </Button>
+                </div>
+                <div className="space-y-3 rounded-xl border border-border/70 bg-muted/15 p-3">
+                  {lineRows.map((row) => (
+                    <div key={row.key} className="space-y-3 rounded-lg border border-border/50 bg-card p-3">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Description
+                          </Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-10 shrink-0 text-muted-foreground hover:text-destructive"
+                            disabled={lineRows.length <= 1}
+                            aria-label={lineRows.length <= 1 ? "At least one line required" : "Remove line"}
+                            onClick={() =>
+                              setLineRows((lines) => (lines.length <= 1 ? lines : lines.filter((l) => l.key !== row.key)))
+                            }
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                        <Input
+                          className="h-11 w-full min-w-0 rounded-xl text-base"
+                          placeholder="Service or product"
+                          value={row.description}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setLineRows((lines) =>
+                              lines.map((l) => (l.key === row.key ? { ...l, description: v } : l))
+                            );
+                          }}
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+                        <div className="space-y-1.5">
+                          <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Qty
+                          </Label>
+                          <Input
+                            inputMode="decimal"
+                            className="h-11 w-full rounded-xl text-base tabular-nums"
+                            placeholder="1"
+                            value={row.quantity}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setLineRows((lines) =>
+                                lines.map((l) => (l.key === row.key ? { ...l, quantity: v } : l))
+                              );
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Unit $
+                          </Label>
+                          <Input
+                            inputMode="decimal"
+                            className="h-11 w-full rounded-xl text-base tabular-nums"
+                            placeholder="0.00"
+                            value={row.unitDollars}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setLineRows((lines) =>
+                                lines.map((l) => (l.key === row.key ? { ...l, unitDollars: v } : l))
+                              );
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm font-semibold tabular-nums text-foreground">
+                  Balance: {(totalCentsPreview / 100).toFixed(2)} USD
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="inv-notes" className="text-sm font-semibold text-foreground">
