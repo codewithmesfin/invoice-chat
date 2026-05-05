@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildInvoiceReminderEmail } from "@/lib/email/invoice-templates";
 import { getEmailFrom, sendTransactionalEmail } from "@/lib/email/smtp";
+import { normalizeInvoiceLines } from "@/lib/invoices/invoice-lines";
 import { assertAppUrl } from "@/lib/stripe/server";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,19 @@ function formatMoney(cents: number, currency: string) {
   } catch {
     return `${(cents / 100).toFixed(2)} ${currency}`;
   }
+}
+
+function formatIssuedDateLabel(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function notesPreview(notes: string | null | undefined): string | null {
+  const n = notes?.trim();
+  if (!n) return null;
+  return n.length > 400 ? `${n.slice(0, 400)}…` : n;
 }
 
 export async function GET(req: Request) {
@@ -36,7 +50,7 @@ export async function GET(req: Request) {
   const { data: rows, error } = await admin
     .from("invoices")
     .select(
-      "id,user_id,number,reminder_count,last_reminder_sent_at,payment_share_token,total_cents,currency,due_date,status,payment_status,customers(email,name)"
+      "id,user_id,number,reminder_count,last_reminder_sent_at,payment_share_token,total_cents,currency,due_date,status,payment_status,created_at,notes,customers(email,name)"
     )
     .in("status", ["sent", "overdue"])
     .neq("payment_status", "succeeded")
@@ -77,12 +91,31 @@ export async function GET(req: Request) {
     const dueLabel = inv.due_date ? String(inv.due_date) : null;
     const customerName = c.name?.trim() || "there";
 
+    const { data: lineRows } = await admin
+      .from("invoice_line_items")
+      .select("description,quantity,unit_amount_cents,sort_order")
+      .eq("invoice_id", inv.id)
+      .order("sort_order", { ascending: true });
+
+    const normalizedLines = normalizeInvoiceLines(lineRows ?? [], {
+      totalCents: inv.total_cents as number,
+    });
+
     const email = buildInvoiceReminderEmail({
       customerName,
       invoiceNumber: String(inv.number),
       amountLabel,
       dueLabel,
       payUrl,
+      invoiceDocument: {
+        currency: (inv.currency as string) || "USD",
+        totalCents: inv.total_cents as number,
+        issuedDateLabel: formatIssuedDateLabel(inv.created_at as string | null),
+        billToName: customerName,
+        billToEmail: c.email.trim(),
+        lines: normalizedLines,
+        notesPreview: notesPreview(inv.notes as string | null),
+      },
     });
 
     let sendData: { messageId: string | undefined };

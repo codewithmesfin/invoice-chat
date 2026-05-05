@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildInvoiceLinkEmail, buildInvoiceReminderEmail } from "@/lib/email/invoice-templates";
 import { getEmailFrom, sendTransactionalEmail } from "@/lib/email/smtp";
+import { normalizeInvoiceLines } from "@/lib/invoices/invoice-lines";
 import { assertAppUrl } from "@/lib/stripe/server";
 
 function formatMoney(cents: number, currency: string) {
@@ -20,6 +21,19 @@ type InvoiceRow = {
   payment_share_token: string | null;
   reminder_count: number | null;
 };
+
+function formatIssuedDateLabel(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function notesPreview(notes: string | null | undefined): string | null {
+  const n = notes?.trim();
+  if (!n) return null;
+  return n.length > 400 ? `${n.slice(0, 400)}…` : n;
+}
 
 /**
  * Sends invoice_link or reminder email; ensures payment_share_token, logs to invoice_email_events.
@@ -56,6 +70,26 @@ export async function deliverInvoiceLinkEmail(opts: {
   const dueLabel = inv.due_date ? String(inv.due_date) : null;
   const invoiceNumber = String(inv.number);
 
+  const [{ data: lineRows }, { data: invExtra }] = await Promise.all([
+    supabase
+      .from("invoice_line_items")
+      .select("description,quantity,unit_amount_cents,sort_order")
+      .eq("invoice_id", invoiceId)
+      .order("sort_order", { ascending: true }),
+    supabase.from("invoices").select("created_at,notes").eq("id", invoiceId).eq("user_id", userId).maybeSingle(),
+  ]);
+
+  const normalizedLines = normalizeInvoiceLines(lineRows ?? [], { totalCents: inv.total_cents });
+  const invoiceDocument = {
+    currency: (inv.currency as string) || "USD",
+    totalCents: inv.total_cents,
+    issuedDateLabel: formatIssuedDateLabel(invExtra?.created_at as string | undefined),
+    billToName: customerName,
+    billToEmail: toEmail,
+    lines: normalizedLines,
+    notesPreview: notesPreview(invExtra?.notes as string | null | undefined),
+  };
+
   const email =
     kind === "reminder"
       ? buildInvoiceReminderEmail({
@@ -64,6 +98,7 @@ export async function deliverInvoiceLinkEmail(opts: {
           amountLabel,
           dueLabel,
           payUrl,
+          invoiceDocument,
         })
       : buildInvoiceLinkEmail({
           customerName,
@@ -71,6 +106,7 @@ export async function deliverInvoiceLinkEmail(opts: {
           amountLabel,
           dueLabel,
           payUrl,
+          invoiceDocument,
         });
 
   let sendData: { messageId: string | undefined };

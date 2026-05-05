@@ -61,10 +61,10 @@ export default async function PayInvoicePage({
   else if (inv.total_cents < 50) state = "too_small";
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-slate-50 to-slate-100/80">
-      <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur">
+    <div className="min-h-dvh bg-gradient-to-b from-slate-50 to-slate-100/80 print:bg-white print:bg-none">
+      <header className="print:hidden border-b border-slate-200/80 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
-          <span className="text-sm font-semibold text-slate-800">Secure pay</span>
+          <span className="text-sm font-semibold text-slate-800">Invoice</span>
           <Link href="/" className="text-sm font-medium text-sky-700 hover:text-sky-800">
             Home
           </Link>
